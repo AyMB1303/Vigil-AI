@@ -3,125 +3,132 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# --- 1. CONFIGURATION ---
-st.set_page_config(page_title="Vigil-AI | Smart Behavior Tracking", layout="wide", page_icon="🛡️")
+# --- 1. CONFIGURATION ÉLÉGANTE ---
+st.set_page_config(page_title="Vigil-AI | ESI Command Center", layout="wide", page_icon="🛡️")
 
-# --- 2. STYLE CSS MODERNE ---
+# CSS Custom : Design "Aérospatial" (Sombre, néon, épuré)
 st.markdown("""
     <style>
     .main { background-color: #0d1117; color: #c9d1d9; }
     div[data-testid="stMetric"] {
-        background: rgba(22, 27, 34, 0.8);
-        border: 1px solid #30363d;
-        padding: 20px; border-radius: 15px;
+        background: rgba(22, 27, 34, 0.5);
+        border-left: 5px solid #58a6ff;
+        padding: 20px; border-radius: 10px;
     }
-    .stButton>button {
-        width: 100%; border-radius: 10px;
-        background: linear-gradient(45deg, #238636, #2ea043);
-        color: white; font-weight: bold; height: 3.5em;
+    .penalty-card {
+        background: linear-gradient(145deg, #1f2428, #0d1117);
+        border: 1px solid #30363d;
+        padding: 25px; border-radius: 20px;
+        text-align: center;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. CHARGEMENT DYNAMIQUE ---
+# --- 2. LOGIQUE DE DONNÉES ---
 @st.cache_data
-def load_data(source):
-    return pd.read_csv(source)
+def load_data():
+    return pd.read_csv('Attendance_Prediction.csv')
 
-# Barre latérale pour l'injection de données
+df = load_data()
+
+# --- 3. SIDEBAR NAVIGATION ---
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/144/shield.png", width=80)
-    st.title("Vigil-AI Console")
-    uploaded_file = st.file_uploader("📥 Importer Dataset (CSV)", type="csv")
+    st.title("Vigil-AI ESI")
+    page = st.radio("Pilotage :", ["📊 Direction & KPI", "👤 Suivi Étudiant 360°", "🧠 Agent IA Expert"])
     st.markdown("---")
-    page = st.radio("Navigation", ["🌐 Dashboard Stratégique", "🎯 Agent IA & Patterns", "💰 Analyse de la Valeur"])
+    st.caption("Règle ESI : Sanction après $16$ séances d'absence.")
 
-# Source de données (soit l'upload, soit le fichier par défaut)
-df = load_data(uploaded_file) if uploaded_file else load_data('Attendance_Prediction.csv')
-
-# --- 4. PAGE 1 : DASHBOARD STRATÉGIQUE ---
-if page == "🌐 Dashboard Stratégique":
-    st.title("🌐 Pilotage Stratégique Global")
+# --- 4. PAGE 1 : DIRECTION & KPI ---
+if page == "📊 Direction & KPI":
+    st.title("📊 Tableau de Bord de Gouvernance")
     
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Assiduité Globale", f"{df['attendance'].mean()*100:.1f}%")
-    m2.metric("Effectif Analysé", len(df['student_id'].unique()))
+    # KPIs Globaux
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Taux d'Assiduité Global", f"{df['attendance'].mean()*100:.1f}%")
     
-    # Identification dynamique du pattern météo le plus risqué
-    weather_risk = df.groupby('weather')['attendance'].mean().idxmin()
-    m3.metric("Facteur de Risque Majeur", f"Météo: {weather_risk}")
+    # Calcul des étudiants proches de la pénalité (ex: > 10 absences)
+    absences_par_eleve = df[df['attendance'] == 0].groupby('student_id').size()
+    critiques = len(absences_par_eleve[absences_par_eleve >= 10])
     
-    # Gain JH basé sur le nombre de lignes actuel
-    jh_gagnes = (len(df) * 5 / 480) 
-    m4.metric("Productivité (JH)", f"{int(jh_gagnes)}")
+    c2.metric("Étudiants à Risque (>10 abs)", f"{critiques}", delta="Attention", delta_color="inverse")
+    c3.metric("JH Économisés", f"{int(len(df)*5/480)} JH")
 
-    st.markdown("---")
-    c1, c2 = st.columns(2)
-    with c1:
-        fig1 = px.pie(df, names='course', hole=0.5, title="Absences par Filière")
-        st.plotly_chart(fig1, use_container_width=True)
-    with c2:
-        fig2 = px.histogram(df, x="absence_reason", title="Répartition des Motifs", color_discrete_sequence=['#58a6ff'])
-        st.plotly_chart(fig2, use_container_width=True)
+    st.markdown("### 📈 Analyse des Flux")
+    fig = px.area(df.groupby('course')['attendance'].mean().reset_index(), 
+                  x="course", y="attendance", title="Stabilité par Filière")
+    st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. PAGE 2 : AGENT IA & PATTERNS (C'EST ICI QUE C'EST DYNAMIQUE) ---
-elif page == "🎯 Agent IA & Patterns":
-    st.title("🎯 Agent IA : Analyse Comportementale")
-    st.write("L'agent identifie les patterns d'absences en fonction du profil saisi.")
+# --- 5. PAGE 2 : SUIVI ÉTUDIANT 360° (TA DEMANDE) ---
+elif page == "👤 Suivi Étudiant 360°":
+    st.title("👤 Dossier Individuel Prédictif")
+    
+    # Sélection de l'élève
+    student_list = df['student_id'].unique()
+    selected_id = st.selectbox("Rechercher un étudiant (ID) :", student_list)
+    
+    student_data = df[df['student_id'] == selected_id]
+    total_absences = len(student_data[student_data['attendance'] == 0])
+    total_sessions = len(student_data)
+    absence_rate = (total_absences / total_sessions) * 100
+    
+    # Interface en colonnes
+    col_info, col_gauge = st.columns([1.5, 1])
+    
+    with col_info:
+        st.markdown(f"### État du Dossier : ID {selected_id}")
+        
+        # Jauge de Pénalité ESI (Seuil 16)
+        remaining = 16 - total_absences
+        if remaining > 0:
+            st.write(f"📉 **Absences cumulées :** {total_absences} / $16$")
+            st.progress(total_absences / 16)
+            st.info(f"Il reste **{remaining} séances** avant la pénalité administrative.")
+        else:
+            st.error(f"🚨 **STATUT : PÉNALISÉ** ({total_absences} absences enregistrées)")
+            st.progress(1.0)
 
-    col_form, col_res = st.columns([1, 1.2])
+        # Pattern Dynamique
+        st.markdown("#### 🔍 Détection de Pattern par l'Agent")
+        pattern_data = student_data[student_data['attendance'] == 0]
+        if not pattern_data.empty:
+            top_reason = pattern_data['absence_reason'].mode()[0]
+            top_weather = pattern_data['weather'].mode()[0]
+            st.warning(f"L'agent identifie un pattern lié à : **{top_reason}** par temps **{top_weather}**.")
 
-    with col_form:
-        st.subheader("Simuler un Profil")
-        with st.container():
-            study = st.slider("Heures d'étude", 0, 10, 4)
-            sleep = st.slider("Heures de sommeil", 3, 12, 7)
-            travel = st.number_input("Trajet (min)", 10, 180, 45)
-            # Ajout d'une condition dynamique : le type de classe
-            class_type = st.selectbox("Type de Session", df['class_type'].unique())
-            weather = st.selectbox("Météo Prévue", df['weather'].unique())
+    with col_gauge:
+        # Risque d'absence à la PROCHAINE séance
+        # Simulation basée sur l'historique de l'élève
+        risk_next = (absence_rate * 1.2) if absence_rate < 80 else 99
+        
+        fig_risk = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = risk_next,
+            title = {'text': "Risque Prochaine Séance (%)"},
+            gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "#f85149" if risk_next > 50 else "#238636"}}
+        ))
+        fig_risk.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font_color="white")
+        st.plotly_chart(fig_risk, use_container_width=True)
+
+# --- 6. PAGE 3 : AGENT IA EXPERT ---
+elif page == "🧠 Agent IA Expert":
+    st.title("🧠 Simulateur de l'Agent Vigil-AI")
+    st.write("Testez la réactivité de l'agent face à des conditions externes.")
+    
+    with st.container():
+        c1, c2 = st.columns(2)
+        study = c1.slider("Heures d'étude", 0, 12, 5)
+        travel = c2.number_input("Temps de trajet (min)", 10, 180, 45)
+        weather = st.select_slider("Météo", options=["Sunny", "Cloudy", "Rainy", "Stormy"])
+        
+        if st.button("Lancer le Diagnostic Global"):
+            risk_score = 15
+            if study < 3: risk_score += 40
+            if travel > 60: risk_score += 20
+            if weather in ["Rainy", "Stormy"]: risk_score += 25
             
-        btn = st.button("Lancer le Scan de l'Agent")
-
-    with col_res:
-        if btn:
-            # ALGORITHME DE DÉTECTION DE PATTERNS
-            # L'IA calcule le risque en fonction de la "moyenne historique" pour ces paramètres précis
-            risk_base = 20
-            
-            # Pattern dynamique : Si l'étudiant étudie peu
-            if study < 3: risk_base += 30
-            
-            # Pattern dynamique : Impact de la météo et du trajet
-            if weather == "rainy" and travel > 60: risk_base += 25
-            
-            # Pattern dynamique : Détection du type de classe (Online vs Offline)
-            if class_type == "offline" and travel > 90:
-                risk_base += 15
-                st.warning(f"⚠️ **Pattern détecté :** Difficulté d'accès aux cours en présentiel due au temps de trajet.")
-
-            st.subheader(f"Probabilité de Pénalité : {risk_base}%")
-            st.progress(risk_base/100)
-            
-            if risk_base > 60:
-                st.error(f"🔴 État : CRITIQUE. Vous avez {risk_base}% de chance d'être pénalisé.")
-                st.write("**Action de l'Agent :** Alerte envoyée pour prévenir une sanction administrative.")
+            st.subheader(f"Score de vulnérabilité : {risk_score}%")
+            if risk_score > 60:
+                st.error("🚨 Alerte : Risque de décrochage élevé détecté.")
             else:
-                st.success(f"🟢 État : STABLE. Risque de pénalité faible ({risk_base}%).")
-
-# --- 6. PAGE 3 : ANALYSE DE LA VALEUR ---
-else:
-    st.title("💰 Analyse de la Valeur & ROI")
-    cost_project = 93600
-    jh_val = (len(df) * 5 / 480)
-    total_gain = jh_val * 1200
-    
-    st.metric("Économie Générée", f"{total_gain:,.0f} DH", f"+{int(jh_val)} JH")
-    
-    fig_roi = go.Figure(go.Indicator(
-        mode = "gauge+number",
-        value = (total_gain / cost_project) * 100,
-        title = {'text': "Rentabilité du Projet (%)"},
-        gauge = {'axis': {'range': [0, 200]}, 'bar': {'color': "#238636"}}
-    ))
-    st.plotly_chart(fig_roi, use_container_width=True)
+                st.success("✅ État : Comportement jugé stable.")
